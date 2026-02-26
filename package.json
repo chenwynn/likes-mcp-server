@@ -1,0 +1,26 @@
+{
+  "name": "likes-open-mcp-server",
+  "version": "1.0.0",
+  "description": "MCP server for My Likes open API (activity, plans, feedback, push plans)",
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "likes-mcp": "dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.3.0"
+  }
+}
