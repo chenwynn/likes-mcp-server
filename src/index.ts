@@ -93,7 +93,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_feedback",
-      description: "Get the user's training feedback in a date range. start and end required; range up to 30 days.",
+      description: "Get the user's training feedback in a date range. start and end required; range up to 30 days. Each row includes coach_comment: true/false (whether current user as coach has already commented on this feedback).",
       inputSchema: {
         type: "object",
         properties: {
@@ -101,6 +101,20 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           end: { type: "string", description: "End date YYYY-MM-DD (required, max 30 days from start)" },
         },
         required: ["start", "end"],
+      },
+    },
+    {
+      name: "add_feedback_comment",
+      description: "Coach adds a comment to a trainee's training feedback (writes to qw_task_feedback_comment, type=1). Current user must be in qw_member and uid must match. All parameters required.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          user_id: { type: "integer", description: "Current user (coach) user_id, must match API key user" },
+          content: { type: "string", description: "Comment content / training advice" },
+          feedback_id: { type: "integer", description: "Trainee's training feedback id (qw_task_feedback.id)" },
+          uid: { type: "integer", description: "Current user's coach id (qw_member.uid)" },
+        },
+        required: ["user_id", "content", "feedback_id", "uid"],
       },
     },
     {
@@ -199,6 +213,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!start || !end) return textResult("list_feedback requires start and end (YYYY-MM-DD).", true);
       const res = await openFetch("/feedback", {
         searchParams: { start, end },
+      });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "add_feedback_comment") {
+      const userId = params.user_id != null ? Number(params.user_id) : NaN;
+      const content = params.content != null ? String(params.content) : "";
+      const feedbackId = params.feedback_id != null ? Number(params.feedback_id) : NaN;
+      const uid = params.uid != null ? Number(params.uid) : NaN;
+      if (Number.isNaN(userId) || userId <= 0 || !content.trim() || Number.isNaN(feedbackId) || feedbackId <= 0 || Number.isNaN(uid) || uid <= 0) {
+        return textResult("add_feedback_comment requires user_id, content, feedback_id, uid (all required and positive).", true);
+      }
+      const res = await openFetch("/feedback/comment", {
+        method: "POST",
+        body: JSON.stringify({ user_id: userId, content: content.trim(), feedback_id: feedbackId, uid }),
       });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
