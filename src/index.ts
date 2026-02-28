@@ -93,13 +93,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_feedback",
-      description: "Get training feedback in a date range. start and end required; range up to 30 days. By default returns current user's feedback; optional user_id: when provided and you are that user's coach (camp editor/coach), returns that trainee's feedback. Each row includes coach_comment: true/false (whether current user as coach has already commented on this feedback).",
+      description: "Get training feedback in a date range. start and end required; range up to 7 days. By default returns current user's feedback; optional user_ids: comma-separated trainee user IDs (e.g. 4,5,6), only allowed if current user is coach of each. Each row includes coach_comment: true/false.",
       inputSchema: {
         type: "object",
         properties: {
           start: { type: "string", description: "Start date YYYY-MM-DD (required)" },
-          end: { type: "string", description: "End date YYYY-MM-DD (required, max 30 days from start)" },
-          user_id: { type: "integer", description: "Optional. Trainee user ID; only allowed if current user is that user's coach (camp editor/coach). Omit to get own feedback." },
+          end: { type: "string", description: "End date YYYY-MM-DD (required, max 7 days from start)" },
+          user_ids: { type: "string", description: "Optional. Comma-separated user IDs (e.g. 4,5,6) to get multiple trainees' feedback; only if current user is coach of each. Omit to get own feedback." },
         },
         required: ["start", "end"],
       },
@@ -211,7 +211,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const end = params.end ? String(params.end) : "";
       if (!start || !end) return textResult("list_feedback requires start and end (YYYY-MM-DD).", true);
       const searchParams: Record<string, string> = { start, end };
-      if (params.user_id != null && Number(params.user_id) > 0) searchParams.user_id = String(params.user_id);
+      if (params.user_ids != null && String(params.user_ids).trim()) searchParams.user_ids = String(params.user_ids).trim();
       const res = await openFetch("/feedback", {
         searchParams,
       });
