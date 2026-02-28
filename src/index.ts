@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MCP server for My Likes open API.
- * Exposes: list_activities, list_plans, list_feedback, push_plans.
+ * Exposes: list_activities, list_plans, list_feedback, push_plans, get_game, list_my_games.
  *
  * Env: BASE_URL (e.g. https://my.likes.com.cn), API_KEY (X-API-Key).
  * Run: npm start  or  node dist/index.js
@@ -53,7 +53,7 @@ function textResult(text: string, isError = false): { content: Array<{ type: "te
 const server = new Server(
   {
     name: "likes-open-mcp-server",
-    version: "1.0.0",
+    version: "1.1.0",
   },
   {
     capabilities: {
@@ -66,10 +66,11 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "list_activities",
-      description: "Get the user's activity list (running/fitness records). Limited to 30 days; rate limit 1 request per 2 minutes per API key.",
+      description: "Get activity list (running/fitness records). By default returns current API key user's data. Optional user_id: when provided and you are that user's coach (editor/coach of a camp they joined), returns that user's activities. Date range max 30 days; rate limit 1 request per minute per API key.",
       inputSchema: {
         type: "object",
         properties: {
+          user_id: { type: "integer", description: "Optional. User ID to query; only allowed if current user is that user's coach (camp editor/coach). Omit to query own data." },
           start_date: { type: "string", description: "Start date YYYY-MM-DD" },
           end_date: { type: "string", description: "End date YYYY-MM-DD (max 30 days from start)" },
           page: { type: "integer", description: "Page number, default 1" },
@@ -104,7 +105,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "push_plans",
-      description: "Push training plans to the user's calendar (batch). Each plan: name (course code), title, start (YYYY-MM-DD), optional weight, type, description, sports, game_id.",
+      description: "Push training plans to calendar (batch). Omit game_id/user_ids to push to current user. To push to multiple trainees as coach: pass game_id (camp ID you own) and user_ids (array of member user IDs, e.g. [4,5,6]). Each plan: name (course code), title, start (YYYY-MM-DD), optional weight, type, description, sports, game_id.",
       inputSchema: {
         type: "object",
         properties: {
@@ -125,8 +126,36 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
               required: ["name", "title", "start"],
             },
           },
+          game_id: { type: "integer", description: "Optional. Required when user_ids is set. Camp ID; you must be editor or coach of this camp." },
+          user_ids: {
+            type: "array",
+            items: { type: "integer" },
+            description: "Optional. List of user IDs to push to (e.g. [4], [4,5,6]). Only members of the camp (game_id); requires game_id. Coach batch push.",
+          },
         },
         required: ["plans"],
+      },
+    },
+    {
+      name: "get_game",
+      description: "Get a training camp (game) detail and its members. Only allowed if current user is the camp's editor or coach. Returns game basic info and members list (total + rows; non-sensitive training-related fields only).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          game_id: { type: "integer", description: "Camp ID (required)" },
+        },
+        required: ["game_id"],
+      },
+    },
+    {
+      name: "list_my_games",
+      description: "List training camps where current user is editor or coach (paginated). Returns only camp basic info, no members. Default 10 per page, max 10.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          page: { type: "integer", description: "Page number, default 1" },
+          limit: { type: "integer", description: "Page size, default 10, max 10" },
+        },
       },
     },
   ],
@@ -143,6 +172,7 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
   try {
     if (name === "list_activities") {
       const searchParams: Record<string, string> = {};
+      if (params.user_id != null) searchParams.user_id = String(params.user_id);
       if (params.start_date) searchParams.start_date = String(params.start_date);
       if (params.end_date) searchParams.end_date = String(params.end_date);
       if (params.page != null) searchParams.page = String(params.page);
@@ -179,10 +209,34 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!Array.isArray(plans) || plans.length === 0) {
         return textResult("push_plans requires a non-empty plans array.", true);
       }
+      const body: { plans: unknown[]; game_id?: number; user_ids?: number[] } = { plans };
+      if (params.game_id != null) body.game_id = Number(params.game_id);
+      if (Array.isArray(params.user_ids) && params.user_ids.length > 0) {
+        body.user_ids = params.user_ids.map((id) => Number(id)).filter((n) => !Number.isNaN(n) && n > 0);
+      }
       const res = await openFetch("/plans/push", {
         method: "POST",
-        body: JSON.stringify({ plans }),
+        body: JSON.stringify(body),
       });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "get_game") {
+      const gameId = params.game_id != null ? Number(params.game_id) : NaN;
+      if (Number.isNaN(gameId) || gameId <= 0) {
+        return textResult("get_game requires game_id (positive integer).", true);
+      }
+      const res = await openFetch("/game", { searchParams: { game_id: String(gameId) } });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "list_my_games") {
+      const searchParams: Record<string, string> = {};
+      if (params.page != null) searchParams.page = String(params.page);
+      if (params.limit != null) searchParams.limit = String(params.limit);
+      const res = await openFetch("/games", { searchParams });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
     }

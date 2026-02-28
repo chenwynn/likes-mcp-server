@@ -2,7 +2,7 @@
   "mcpServers": {
     "likes-open-api": {
       "command": "node",
-      "args": ["/Library/WebServer/Documents/likes_api/mcp-server/dist/index.js"],
+      "args": ["/Library/WebServer/Documents/likes-mcp-server/dist/index.js"],
       "env": {
         "BASE_URL": "https://my.likes.com.cn",
         "API_KEY": "YOUR_API_KEY"
