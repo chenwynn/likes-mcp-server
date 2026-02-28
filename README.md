@@ -8,8 +8,8 @@ MCP (Model Context Protocol) server that exposes the My Likes open API as tools 
 |------|-------------|
 | `list_activities` | Activity list (30-day range; optional `user_id` for coach to query trainee; rate limit 1 req / 1 min) |
 | `list_plans` | Calendar plans (from start date, 42 days) |
-| `list_feedback` | Training feedback (start/end required, max 7 days). Optional `user_ids` (comma-separated) to get multiple trainees' feedback (only if you are coach of each). Each row has `coach_comment`. |
-| `add_feedback_comment` | Coach adds a comment to a trainee's training feedback. Params: `content`, `feedback_id` (user_id/uid from session and qw_member). |
+| `list_feedback` | Training feedback (start/end required, max 7 days). Optional `user_ids` (comma-separated) to get multiple trainees' feedback (only if you are coach of each). Each row includes `plan_title`, `plan_content`, `activity` (linked workout overview with system `score`), `coach_comment`. |
+| `add_feedback_comment` | Coach adds a comment to a trainee's training feedback. Params: `content`, `feedback_id`. |
 | `push_plans` | Push training plans to calendar (batch). Optional `game_id` + `user_ids` for coach batch push to trainees. |
 | `get_game` | Get a training camp (game) detail and members. Requires `game_id`; only if you are the camp's editor or coach. |
 | `list_my_games` | List camps where you are editor or coach (paginated, default 10 per page, max 10). |

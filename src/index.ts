@@ -93,7 +93,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_feedback",
-      description: "Get training feedback in a date range. start and end required; range up to 7 days. By default returns current user's feedback; optional user_ids: comma-separated trainee user IDs (e.g. 4,5,6), only allowed if current user is coach of each. Each row includes coach_comment: true/false.",
+      description: "Get training feedback in a date range. start and end required; range up to 7 days. By default returns current user's feedback; optional user_ids: comma-separated trainee user IDs (e.g. 4,5,6), only allowed if current user is coach of each. Each row includes: plan_title, plan_content (course segment for coach comparison), activity (overview of linked workout with system score for coach reference), coach_comment (whether you have commented).",
       inputSchema: {
         type: "object",
         properties: {
@@ -106,12 +106,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "add_feedback_comment",
-      description: "Coach adds a comment to a trainee's training feedback (writes to qw_task_feedback_comment, type=1). Current user must be in qw_member (coach). user_id and uid are taken from session and qw_member on the server; only content and feedback_id are required.",
+      description: "Coach adds a comment to a trainee's training feedback. Current user must be a coach; identity is determined by the server. Only content and feedback_id are required.",
       inputSchema: {
         type: "object",
         properties: {
           content: { type: "string", description: "Comment content / training advice" },
-          feedback_id: { type: "integer", description: "Trainee's training feedback id (qw_task_feedback.id)" },
+          feedback_id: { type: "integer", description: "The training feedback id (from list_feedback rows)" },
         },
         required: ["content", "feedback_id"],
       },
