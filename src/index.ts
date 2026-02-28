@@ -93,12 +93,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "list_feedback",
-      description: "Get the user's training feedback in a date range. start and end required; range up to 30 days. Each row includes coach_comment: true/false (whether current user as coach has already commented on this feedback).",
+      description: "Get training feedback in a date range. start and end required; range up to 30 days. By default returns current user's feedback; optional user_id: when provided and you are that user's coach (camp editor/coach), returns that trainee's feedback. Each row includes coach_comment: true/false (whether current user as coach has already commented on this feedback).",
       inputSchema: {
         type: "object",
         properties: {
           start: { type: "string", description: "Start date YYYY-MM-DD (required)" },
           end: { type: "string", description: "End date YYYY-MM-DD (required, max 30 days from start)" },
+          user_id: { type: "integer", description: "Optional. Trainee user ID; only allowed if current user is that user's coach (camp editor/coach). Omit to get own feedback." },
         },
         required: ["start", "end"],
       },
@@ -211,8 +212,10 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const start = params.start ? String(params.start) : "";
       const end = params.end ? String(params.end) : "";
       if (!start || !end) return textResult("list_feedback requires start and end (YYYY-MM-DD).", true);
+      const searchParams: Record<string, string> = { start, end };
+      if (params.user_id != null && Number(params.user_id) > 0) searchParams.user_id = String(params.user_id);
       const res = await openFetch("/feedback", {
-        searchParams: { start, end },
+        searchParams,
       });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
