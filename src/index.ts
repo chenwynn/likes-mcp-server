@@ -106,16 +106,14 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "add_feedback_comment",
-      description: "Coach adds a comment to a trainee's training feedback (writes to qw_task_feedback_comment, type=1). Current user must be in qw_member and uid must match. All parameters required.",
+      description: "Coach adds a comment to a trainee's training feedback (writes to qw_task_feedback_comment, type=1). Current user must be in qw_member (coach). user_id and uid are taken from session and qw_member on the server; only content and feedback_id are required.",
       inputSchema: {
         type: "object",
         properties: {
-          user_id: { type: "integer", description: "Current user (coach) user_id, must match API key user" },
           content: { type: "string", description: "Comment content / training advice" },
           feedback_id: { type: "integer", description: "Trainee's training feedback id (qw_task_feedback.id)" },
-          uid: { type: "integer", description: "Current user's coach id (qw_member.uid)" },
         },
-        required: ["user_id", "content", "feedback_id", "uid"],
+        required: ["content", "feedback_id"],
       },
     },
     {
@@ -222,16 +220,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "add_feedback_comment") {
-      const userId = params.user_id != null ? Number(params.user_id) : NaN;
       const content = params.content != null ? String(params.content) : "";
       const feedbackId = params.feedback_id != null ? Number(params.feedback_id) : NaN;
-      const uid = params.uid != null ? Number(params.uid) : NaN;
-      if (Number.isNaN(userId) || userId <= 0 || !content.trim() || Number.isNaN(feedbackId) || feedbackId <= 0 || Number.isNaN(uid) || uid <= 0) {
-        return textResult("add_feedback_comment requires user_id, content, feedback_id, uid (all required and positive).", true);
+      if (!content.trim() || Number.isNaN(feedbackId) || feedbackId <= 0) {
+        return textResult("add_feedback_comment requires content and feedback_id (both required; feedback_id positive).", true);
       }
       const res = await openFetch("/feedback/comment", {
         method: "POST",
-        body: JSON.stringify({ user_id: userId, content: content.trim(), feedback_id: feedbackId, uid }),
+        body: JSON.stringify({ content: content.trim(), feedback_id: feedbackId }),
       });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
