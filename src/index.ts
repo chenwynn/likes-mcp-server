@@ -81,6 +81,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
+      name: "get_activity_detail",
+      description: "Get raw JSON detail for one activity by id (from list_activities). Uses data_source_path; supports overview (record field set to null) or full detailed (including GPS). Same permission as activity list: own or coach of that user.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "integer", description: "Activity ID (signlog id), required; from list_activities rows." },
+          mode: { type: "string", enum: ["overview", "detailed"], description: "overview: return JSON with record=null; detailed: full raw JSON. Default overview." },
+        },
+        required: ["id"],
+      },
+    },
+    {
       name: "list_plans",
       description: "Get the user's calendar plans. Returns plans from start date for 42 days.",
       inputSchema: {
@@ -118,7 +130,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "push_plans",
-      description: "Push training plans to calendar (batch). Omit game_id/user_ids to push to current user. To push to multiple trainees as coach: pass game_id (camp ID you own) and user_ids (array of member user IDs, e.g. [4,5,6]). Each plan: name (course code), title, start (YYYY-MM-DD), optional weight, type, description, sports, game_id.",
+      description: "Push training plans to calendar (batch). Omit game_id/user_ids to push to current user. To push to multiple trainees as coach: pass game_id (camp ID you own) and user_ids (array of member user IDs, e.g. [4,5,6]). Optional overwrite: when true, deletes existing plans that match (game_id, user_id, created_id=you, start_time) before inserting. Each plan: name (course code), title, start (YYYY-MM-DD), optional weight, type, description, sports, game_id.",
       inputSchema: {
         type: "object",
         properties: {
@@ -145,6 +157,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
             items: { type: "integer" },
             description: "Optional. List of user IDs to push to (e.g. [4], [4,5,6]). Only members of the camp (game_id); requires game_id. Coach batch push.",
           },
+          overwrite: { type: "boolean", description: "Optional. If true, delete existing plans matching (game_id, user_id, created_id=you, start_time) before inserting, so the same slot is replaced instead of duplicated." },
         },
         required: ["plans"],
       },
@@ -197,6 +210,15 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return textResult(res.body);
     }
 
+    if (name === "get_activity_detail") {
+      const id = params.id != null ? Number(params.id) : NaN;
+      if (Number.isNaN(id) || id <= 0) return textResult("get_activity_detail requires id (positive integer).", true);
+      const mode = params.mode === "detailed" ? "detailed" : "overview";
+      const res = await openFetch("/activity/detail", { searchParams: { id: String(id), mode } });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
     if (name === "list_plans") {
       const searchParams: Record<string, string> = {};
       if (params.start) searchParams.start = String(params.start);
@@ -238,11 +260,12 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (!Array.isArray(plans) || plans.length === 0) {
         return textResult("push_plans requires a non-empty plans array.", true);
       }
-      const body: { plans: unknown[]; game_id?: number; user_ids?: number[] } = { plans };
+      const body: { plans: unknown[]; game_id?: number; user_ids?: number[]; overwrite?: boolean } = { plans };
       if (params.game_id != null) body.game_id = Number(params.game_id);
       if (Array.isArray(params.user_ids) && params.user_ids.length > 0) {
         body.user_ids = params.user_ids.map((id) => Number(id)).filter((n) => !Number.isNaN(n) && n > 0);
       }
+      if (params.overwrite === true) body.overwrite = true;
       const res = await openFetch("/plans/push", {
         method: "POST",
         body: JSON.stringify(body),
