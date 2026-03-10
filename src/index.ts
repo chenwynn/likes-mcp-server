@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MCP server for My Likes open API.
- * Exposes: list_activities, list_plans, list_feedback, push_plans, get_game, list_my_games.
+ * Exposes: list_activities, list_plans, list_feedback, push_plans, get_game, list_my_games, get_running_ability.
  *
  * Env: BASE_URL (e.g. https://my.likes.com.cn), API_KEY (X-API-Key).
  * Run: npm start  or  node dist/index.js
@@ -53,7 +53,7 @@ function textResult(text: string, isError = false): { content: Array<{ type: "te
 const server = new Server(
   {
     name: "likes-open-mcp-server",
-    version: "1.1.0",
+    version: "1.2.0",
   },
   {
     capabilities: {
@@ -184,6 +184,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: "get_running_ability",
+      description: "Get running ability: predicted race times and training pace zones by run force (ability value), or estimate run force from race times. Two modes: (1) Pass runforce (0–99, e.g. 50.5) and optional celsius (0–40, default 6) to get pace_zones (E/M/T/A/I/R, min:sec per km) and predicted_times (marathon, half_marathon, 10km, 5km, 3km, 1600m). (2) Pass at least one race time: time_5km, time_10km, time_hm, time_fm, time_3km, time_mile. Time format: seconds (e.g. 1948) or M:SS (e.g. 32:28) or H:MM:SS. Returns runforce (xx.x) and by_distance (per-parameter run force estimate).",
+      inputSchema: {
+        type: "object",
+        properties: {
+          runforce: { type: "number", description: "Ability value 0–99 (e.g. 50.5). Use this for mode 1; omit when using race times." },
+          celsius: { type: "integer", description: "Optional. Temperature in Celsius for pace adjustment, 0–40, default 6. Only used when runforce is set." },
+          time_5km: { type: "string", description: "5 km race time: seconds or M:SS or H:MM:SS. Mode 2." },
+          time_10km: { type: "string", description: "10 km race time. Same format. Mode 2." },
+          time_hm: { type: "string", description: "Half marathon time. Same format. Mode 2." },
+          time_fm: { type: "string", description: "Full marathon time. Same format. Mode 2." },
+          time_3km: { type: "string", description: "3 km time. Same format. Mode 2." },
+          time_mile: { type: "string", description: "1600 m time. Same format. Mode 2." },
+        },
+      },
+    },
   ],
 }));
 
@@ -289,6 +306,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (params.page != null) searchParams.page = String(params.page);
       if (params.limit != null) searchParams.limit = String(params.limit);
       const res = await openFetch("/games", { searchParams });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "get_running_ability") {
+      const searchParams: Record<string, string> = {};
+      if (params.runforce != null) searchParams.runforce = String(params.runforce);
+      if (params.celsius != null) searchParams.celsius = String(params.celsius);
+      const timeKeys = ["time_5km", "time_10km", "time_hm", "time_fm", "time_3km", "time_mile"] as const;
+      for (const key of timeKeys) {
+        if (params[key] != null && String(params[key]).trim()) searchParams[key] = String(params[key]).trim();
+      }
+      const hasRunforce = searchParams.runforce != null;
+      const hasAnyTime = timeKeys.some((k) => searchParams[k] != null);
+      if (!hasRunforce && !hasAnyTime) {
+        return textResult("get_running_ability requires either runforce (0–99) or at least one race time (time_5km, time_10km, time_hm, time_fm, time_3km, time_mile).", true);
+      }
+      const res = await openFetch("/ability", { searchParams });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
     }
