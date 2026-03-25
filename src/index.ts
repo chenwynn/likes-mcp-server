@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * MCP server for My Likes open API.
- * Exposes: list_activities, list_plans, list_feedback, push_plans, get_game, list_my_games, get_running_ability.
+ * Exposes: list_activities, get_health, list_plans, list_feedback, push_plans, get_game, list_my_games, get_running_ability.
  *
  * Env: BASE_URL (e.g. https://my.likes.com.cn), API_KEY (X-API-Key).
  * Run: npm start  or  node dist/index.js
@@ -53,7 +53,7 @@ function textResult(text: string, isError = false): { content: Array<{ type: "te
 const server = new Server(
   {
     name: "likes-open-mcp-server",
-    version: "1.2.0",
+    version: "1.2.2",
   },
   {
     capabilities: {
@@ -90,6 +90,18 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           mode: { type: "string", enum: ["overview", "detailed"], description: "overview: return JSON with record=null; detailed: full raw JSON. Default overview." },
         },
         required: ["id"],
+      },
+    },
+    {
+      name: "get_health",
+      description: "Get health data for secondary analysis in a date range. Returns daily HRV (hrv[]) and sleep-related summary (sleep[]). Optional user_id is allowed only when current user is that user's coach. Max range 31 days; if both start_date/end_date omitted, server defaults to latest 31 days.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          user_id: { type: "integer", description: "Optional. User ID to query; only allowed if current user is that user's coach. Omit to query own data." },
+          start_date: { type: "string", description: "Start date YYYY-MM-DD" },
+          end_date: { type: "string", description: "End date YYYY-MM-DD (max 31 days from start)" },
+        },
       },
     },
     {
@@ -241,6 +253,16 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       if (params.start) searchParams.start = String(params.start);
       if (params.game_id != null) searchParams.game_id = String(params.game_id);
       const res = await openFetch("/plans", { searchParams });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "get_health") {
+      const searchParams: Record<string, string> = {};
+      if (params.user_id != null) searchParams.user_id = String(params.user_id);
+      if (params.start_date) searchParams.start_date = String(params.start_date);
+      if (params.end_date) searchParams.end_date = String(params.end_date);
+      const res = await openFetch("/health", { searchParams });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
     }

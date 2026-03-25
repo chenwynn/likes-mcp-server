@@ -1,7 +1,7 @@
 {
   "name": "likes-open-mcp-server",
-  "version": "1.2.1",
-  "description": "MCP server for My Likes open API (activity, plans, feedback, push plans, game, games, running ability)",
+  "version": "1.2.2",
+  "description": "MCP server for My Likes open API (activity, health, plans, feedback, push plans, game, games, ability)",
   "type": "module",
   "main": "dist/index.js",
   "bin": {
