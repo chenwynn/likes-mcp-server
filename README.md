@@ -7,7 +7,7 @@ MCP (Model Context Protocol) server that exposes the My Likes open API as tools 
 | Tool | Description |
 |------|-------------|
 | `list_activities` | Activity list (30-day range; optional `user_id` for coach to query trainee; rate limit 1 req / 1 min) |
-| `get_health` | Health data for secondary analysis (daily `hrv` + sleep-related daily summary `sleep`). Optional `user_id` for coach to query trainee. Max range 31 days. |
+| `get_health` | Health data for secondary analysis (daily `hrv` + sleep-related daily summary `sleep`). Supports optional `user_id` (single user) or `user_ids` (comma-separated batch trainees). Querying others requires coach permission for each target. Max range 31 days. |
 | `list_plans` | Calendar plans (from start date, 42 days) |
 | `list_feedback` | Training feedback (start/end required, max 7 days). Optional `user_ids` (comma-separated) to get multiple trainees' feedback (only if you are coach of each). Each row includes `plan_title`, `plan_content`, `activity` (linked workout overview with system `score`), `coach_comment`. |
 | `add_feedback_comment` | Coach adds a comment to a trainee's training feedback. Params: `content`, `feedback_id`. |
@@ -73,7 +73,7 @@ Use the absolute path to `likes-mcp-server/dist/index.js`. Ensure `npm run build
 See the in-app docs (设置 → API 文档) or the open API routes:
 
 - `GET /api/open/activity` – activity list (optional `user_id` for coach)
-- `GET /api/open/health` – health data (`hrv` + sleep-related summary), optional `user_id` for coach, max 31 days
+- `GET /api/open/health` – health data (`hrv` + sleep-related summary), optional `user_id` (single) or `user_ids` (comma-separated batch), max 31 days; querying others requires coach permission for each target
 - `GET /api/open/plans` – plans list
 - `GET /api/open/feedback` – feedback (start, end; max 7 days; optional user_ids comma-separated); response rows include `coach_comment`
 - `POST /api/open/feedback/comment` – coach comment on a feedback (body: `content`, `feedback_id`; user_id/uid from session)

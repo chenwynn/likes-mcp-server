@@ -53,7 +53,7 @@ function textResult(text: string, isError = false): { content: Array<{ type: "te
 const server = new Server(
   {
     name: "likes-open-mcp-server",
-    version: "1.2.2",
+    version: "1.2.3",
   },
   {
     capabilities: {
@@ -94,11 +94,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_health",
-      description: "Get health data for secondary analysis in a date range. Returns daily HRV (hrv[]) and sleep-related summary (sleep[]). Optional user_id is allowed only when current user is that user's coach. Max range 31 days; if both start_date/end_date omitted, server defaults to latest 31 days.",
+      description: "Get health data for secondary analysis in a date range. Supports single-user (user_id) and batch trainee query (user_ids, comma-separated). Querying others is allowed only when current user is coach of each target user. Max range 31 days; if both start_date/end_date omitted, server defaults to latest 31 days.",
       inputSchema: {
         type: "object",
         properties: {
-          user_id: { type: "integer", description: "Optional. User ID to query; only allowed if current user is that user's coach. Omit to query own data." },
+          user_id: { type: "integer", description: "Optional. Single user ID to query; only allowed if current user is that user's coach. Omit to query own data." },
+          user_ids: { type: "string", description: "Optional. Comma-separated user IDs for batch trainee query (e.g. 4,5,6). Only allowed if current user is coach of each target user. If both user_id and user_ids are passed, user_ids takes precedence." },
           start_date: { type: "string", description: "Start date YYYY-MM-DD" },
           end_date: { type: "string", description: "End date YYYY-MM-DD (max 31 days from start)" },
         },
@@ -259,7 +260,17 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (name === "get_health") {
       const searchParams: Record<string, string> = {};
-      if (params.user_id != null) searchParams.user_id = String(params.user_id);
+      if (Array.isArray(params.user_ids) && params.user_ids.length > 0) {
+        const ids = params.user_ids
+          .map((id) => Number(id))
+          .filter((n) => !Number.isNaN(n) && n > 0)
+          .join(",");
+        if (ids) searchParams.user_ids = ids;
+      } else if (params.user_ids != null && String(params.user_ids).trim()) {
+        searchParams.user_ids = String(params.user_ids).trim();
+      } else if (params.user_id != null) {
+        searchParams.user_id = String(params.user_id);
+      }
       if (params.start_date) searchParams.start_date = String(params.start_date);
       if (params.end_date) searchParams.end_date = String(params.end_date);
       const res = await openFetch("/health", { searchParams });
