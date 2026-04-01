@@ -2,6 +2,12 @@
 
 MCP (Model Context Protocol) server that exposes the My Likes open API as tools for LLM clients (e.g. Cursor, other MCP consumers).
 
+## What's New (v1.2.4)
+
+- Added `get_period_report_json` tool for `GET /api/reporter/generatejson-sync`
+- Added explicit permission notes for self/coached-trainee and `game_id` membership checks
+- Updated package description to include period report capability
+
 ## Tools
 
 | Tool | Description |
