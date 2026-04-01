@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 /**
  * MCP server for My Likes open API.
- * Exposes: list_activities, get_health, list_plans, list_feedback, push_plans, get_game, list_my_games, get_running_ability.
+ * Exposes: list_activities, get_health, list_plans, list_feedback, push_plans,
+ * get_game, list_my_games, get_running_ability, get_period_report_json.
  *
  * Env: BASE_URL (e.g. https://my.likes.com.cn), API_KEY (X-API-Key).
  * Run: npm start  or  node dist/index.js
@@ -21,11 +22,37 @@ function apiPath(path: string): string {
   return `${BASE_URL}/api/open${path}`;
 }
 
+function reporterApiPath(path: string): string {
+  return `${BASE_URL}/api/reporter${path}`;
+}
+
 async function openFetch(
   path: string,
   options: { method?: string; body?: string; searchParams?: Record<string, string> } = {}
 ): Promise<{ ok: boolean; status: number; body: string }> {
   const url = new URL(apiPath(path));
+  if (options.searchParams) {
+    Object.entries(options.searchParams).forEach(([k, v]) => url.searchParams.set(k, v));
+  }
+  const headers: Record<string, string> = {
+    "X-API-Key": API_KEY,
+    "Accept": "application/json",
+  };
+  if (options.body) headers["Content-Type"] = "application/json";
+  const res = await fetch(url.toString(), {
+    method: options.method || "GET",
+    headers,
+    body: options.body,
+  });
+  const body = await res.text();
+  return { ok: res.ok, status: res.status, body };
+}
+
+async function reporterFetch(
+  path: string,
+  options: { method?: string; body?: string; searchParams?: Record<string, string> } = {}
+): Promise<{ ok: boolean; status: number; body: string }> {
+  const url = new URL(reporterApiPath(path));
   if (options.searchParams) {
     Object.entries(options.searchParams).forEach(([k, v]) => url.searchParams.set(k, v));
   }
@@ -214,6 +241,21 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         },
       },
     },
+    {
+      name: "get_period_report_json",
+      description: "Generate period training report JSON via /api/reporter/generatejson-sync. Requires X-API-Key. You can query yourself, or trainees you coach. If game_id is provided, current user must be editor/coach of that camp and target user must be a member.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          user_id: { type: "integer", description: "Target user ID (required)." },
+          range_unit: { type: "string", enum: ["day", "week", "month"], description: "Aggregation unit, default month." },
+          start_time: { type: "string", description: "Start date YYYY-MM-DD. Usually pass together with end_time." },
+          end_time: { type: "string", description: "End date YYYY-MM-DD. Server treats as 23:59:59 of that day." },
+          game_id: { type: "integer", description: "Optional camp ID. If start_time/end_time omitted, server infers range from camp." },
+        },
+        required: ["user_id"],
+      },
+    },
   ],
 }));
 
@@ -357,6 +399,21 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         return textResult("get_running_ability requires either runforce (0–99) or at least one race time (time_5km, time_10km, time_hm, time_fm, time_3km, time_mile).", true);
       }
       const res = await openFetch("/ability", { searchParams });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
+    if (name === "get_period_report_json") {
+      const userId = params.user_id != null ? Number(params.user_id) : NaN;
+      if (Number.isNaN(userId) || userId <= 0) {
+        return textResult("get_period_report_json requires user_id (positive integer).", true);
+      }
+      const searchParams: Record<string, string> = { user_id: String(userId) };
+      if (params.range_unit) searchParams.range_unit = String(params.range_unit);
+      if (params.start_time) searchParams.start_time = String(params.start_time);
+      if (params.end_time) searchParams.end_time = String(params.end_time);
+      if (params.game_id != null) searchParams.game_id = String(params.game_id);
+      const res = await reporterFetch("/generatejson-sync", { searchParams });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
       return textResult(res.body);
     }

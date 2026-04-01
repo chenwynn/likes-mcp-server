@@ -15,6 +15,7 @@ MCP (Model Context Protocol) server that exposes the My Likes open API as tools 
 | `get_game` | Get a training camp (game) detail and members. Requires `game_id`; only if you are the camp's editor or coach. |
 | `list_my_games` | List camps where you are editor or coach (paginated, default 10 per page, max 10). |
 | `get_running_ability` | Running ability: by run force (0–99) get predicted times and pace zones (E/M/T/A/I/R); or by race times (time_5km, time_10km, time_hm, time_fm, time_3km, time_mile) get estimated run force. Time format: seconds or M:SS or H:MM:SS. |
+| `get_period_report_json` | Generate period report JSON (`/api/reporter/generatejson-sync`). Requires `user_id`; supports `range_unit`, `start_time`, `end_time`, `game_id`. Permission: self or coached trainee; when `game_id` is passed, caller must be editor/coach of camp and target user must be a camp member. |
 
 ## Setup
 
@@ -82,3 +83,4 @@ See the in-app docs (设置 → API 文档) or the open API routes:
 - `GET /api/open/game?game_id=` – camp detail and members (ownership required)
 - `GET /api/open/games` – list my camps (page, limit)
 - `GET /api/open/ability` – running ability: query by `runforce` (0–99) + optional `celsius`, or by race times (`time_5km`, `time_10km`, `time_hm`, `time_fm`, `time_3km`, `time_mile`). Returns run force, pace zones, predicted times or by-distance run force.
+- `GET /api/reporter/generatejson-sync` – period report JSON generation (requires `X-API-Key`, `user_id`; optional `range_unit`, `start_time`, `end_time`, `game_id`; includes coach/member permission checks).
