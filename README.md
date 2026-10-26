@@ -8,6 +8,7 @@ MCP (Model Context Protocol) server that exposes the My Likes open API as tools 
 - Added `get_metrics` tool (`GET /api/open/metrics`): current params, daily fitness/fatigue/performance curve, run force & threshold pace change logs, weight logs, PBs
 - `list_plans`: new `user_id` (admin only) and `end` params
 - `list_feedback`: new `page` / `page_size` params
+- `get_activity_detail`: documented as single-activity only — don't loop over it for long-range analysis
 
 ## v1.2.4
 

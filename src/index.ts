@@ -109,7 +109,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_activity_detail",
-      description: "Get raw JSON detail for one activity by id (from list_activities). Uses data_source_path; supports overview (record field set to null) or full detailed (including GPS). Same permission as activity list: own, coach of that user, or platform admin.",
+      description: "Get raw JSON detail for one activity by id (from list_activities). Uses data_source_path; supports overview (record field set to null) or full detailed (including GPS). Same permission as activity list: own, coach of that user, or platform admin. EXPENSIVE: do NOT call this per activity or in a loop for multi-activity / long-range analysis — use list_activities summary rows instead. Only call when the user explicitly asks about one specific activity, and prefer mode=overview.",
       inputSchema: {
         type: "object",
         properties: {
