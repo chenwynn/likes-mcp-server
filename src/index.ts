@@ -1,8 +1,8 @@
 #!/usr/bin/env node
 /**
  * MCP server for My Likes open API.
- * Exposes: list_activities, get_health, list_plans, list_feedback, push_plans,
- * get_game, list_my_games, get_running_ability, get_period_report_json.
+ * Exposes: list_activities, get_activity_detail, get_health, get_metrics, list_plans, list_feedback,
+ * add_feedback_comment, push_plans, get_game, list_my_games, get_running_ability, get_period_report_json.
  *
  * Env: BASE_URL (e.g. https://my.likes.com.cn), API_KEY (X-API-Key).
  * Run: npm start  or  node dist/index.js
@@ -80,7 +80,7 @@ function textResult(text: string, isError = false): { content: Array<{ type: "te
 const server = new Server(
   {
     name: "likes-open-mcp-server",
-    version: "1.2.3",
+    version: "1.3.0",
   },
   {
     capabilities: {
@@ -93,13 +93,13 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
   tools: [
     {
       name: "list_activities",
-      description: "Get activity list (running/fitness records). By default returns current API key user's data. Optional user_id: when provided and you are that user's coach (editor/coach of a camp they joined), returns that user's activities. Date range max 30 days; rate limit 1 request per minute per API key.",
+      description: "Get activity list (running/fitness records). By default returns current API key user's data. Optional user_id: when provided and you are that user's coach (editor/coach of a camp they joined), returns that user's activities. Date range max 31 days; rate limit 1 request per minute per API key. Platform admin API keys (admin group) can query ANY user_id with date range up to 366 days. Admin keys are not subject to the 1/min limit; use limit up to 2000 to fetch long ranges in one call.",
       inputSchema: {
         type: "object",
         properties: {
-          user_id: { type: "integer", description: "Optional. User ID to query; only allowed if current user is that user's coach (camp editor/coach). Omit to query own data." },
+          user_id: { type: "integer", description: "Optional. User ID to query; allowed if current user is that user's coach (camp editor/coach) or a platform admin. Omit to query own data." },
           start_date: { type: "string", description: "Start date YYYY-MM-DD" },
-          end_date: { type: "string", description: "End date YYYY-MM-DD (max 30 days from start)" },
+          end_date: { type: "string", description: "End date YYYY-MM-DD (max 31 days from start; 366 for platform admin)" },
           page: { type: "integer", description: "Page number, default 1" },
           limit: { type: "integer", description: "Page size, default 20, max 2000" },
           order_by: { type: "string", description: "e.g. sign_date, run_km, run_time, tss" },
@@ -109,7 +109,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_activity_detail",
-      description: "Get raw JSON detail for one activity by id (from list_activities). Uses data_source_path; supports overview (record field set to null) or full detailed (including GPS). Same permission as activity list: own or coach of that user.",
+      description: "Get raw JSON detail for one activity by id (from list_activities). Uses data_source_path; supports overview (record field set to null) or full detailed (including GPS). Same permission as activity list: own, coach of that user, or platform admin.",
       inputSchema: {
         type: "object",
         properties: {
@@ -121,36 +121,52 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_health",
-      description: "Get health data for secondary analysis in a date range. Supports single-user (user_id) and batch trainee query (user_ids, comma-separated). Querying others is allowed only when current user is coach of each target user. Max range 31 days; if both start_date/end_date omitted, server defaults to latest 31 days.",
+      description: "Get health data for secondary analysis in a date range. Supports single-user (user_id) and batch trainee query (user_ids, comma-separated). Querying others is allowed only when current user is coach of each target user (or platform admin). Max range 31 days (366 for platform admin); if both start_date/end_date omitted, server defaults to the latest max range.",
       inputSchema: {
         type: "object",
         properties: {
           user_id: { type: "integer", description: "Optional. Single user ID to query; only allowed if current user is that user's coach. Omit to query own data." },
           user_ids: { type: "string", description: "Optional. Comma-separated user IDs for batch trainee query (e.g. 4,5,6). Only allowed if current user is coach of each target user. If both user_id and user_ids are passed, user_ids takes precedence." },
           start_date: { type: "string", description: "Start date YYYY-MM-DD" },
-          end_date: { type: "string", description: "End date YYYY-MM-DD (max 31 days from start)" },
+          end_date: { type: "string", description: "End date YYYY-MM-DD (max 31 days from start; 366 for platform admin)" },
+        },
+      },
+    },
+    {
+      name: "get_metrics",
+      description: "Get training parameter changes in a date range: current params (run_force, t_pace sec/km, ftp, css, max/min heart rate, weight, height), daily fitness/fatigue/performance curve (CTL/ATL/TSB + TSS), run_force & threshold pace change logs (run_force value is 3-digit int, 477 = 47.7), weight logs, and PBs set in the range. Own data by default; user_id allowed for coach of that user or platform admin. Max range 31 days (366 for platform admin); defaults to the latest max range ending today.",
+      inputSchema: {
+        type: "object",
+        properties: {
+          user_id: { type: "integer", description: "Optional. Target user ID; coach of that user or platform admin. Omit to query own data." },
+          start_date: { type: "string", description: "Start date YYYY-MM-DD" },
+          end_date: { type: "string", description: "End date YYYY-MM-DD; default today" },
         },
       },
     },
     {
       name: "list_plans",
-      description: "Get the user's calendar plans. Returns plans from start date for 42 days.",
+      description: "Get calendar plans. Returns plans from start date for 42 days, or up to end if given (max 42 days; 366 for platform admin). Own plans by default; user_id is only allowed for platform admin.",
       inputSchema: {
         type: "object",
         properties: {
+          user_id: { type: "integer", description: "Optional. Target user ID (platform admin only). Omit to query own plans." },
           start: { type: "string", description: "Start date YYYY-MM-DD; default today" },
+          end: { type: "string", description: "Optional end date YYYY-MM-DD (inclusive)" },
           game_id: { type: "integer", description: "Plan type ID filter, optional" },
         },
       },
     },
     {
       name: "list_feedback",
-      description: "Get training feedback in a date range. start and end required; range up to 7 days. By default returns current user's feedback; optional user_ids: comma-separated trainee user IDs (e.g. 4,5,6), only allowed if current user is coach of each. Each row includes: plan_title, plan_content (course segment for coach comparison), activity (overview of linked workout with system score for coach reference), coach_comment (whether you have commented).",
+      description: "Get training feedback in a date range. start and end required; range up to 7 days (366 for platform admin, paginated). By default returns current user's feedback; optional user_ids: comma-separated trainee user IDs (e.g. 4,5,6), only allowed if current user is coach of each or platform admin. Each row includes: plan_title, plan_content (course segment for coach comparison), activity (overview of linked workout with system score for coach reference), coach_comment (whether you have commented).",
       inputSchema: {
         type: "object",
         properties: {
           start: { type: "string", description: "Start date YYYY-MM-DD (required)" },
-          end: { type: "string", description: "End date YYYY-MM-DD (required, max 7 days from start)" },
+          end: { type: "string", description: "End date YYYY-MM-DD (required, max 7 days from start; 366 for platform admin)" },
+          page: { type: "integer", description: "Page number, default 1" },
+          page_size: { type: "integer", description: "Page size, default 50, max 100" },
           user_ids: { type: "string", description: "Optional. Comma-separated user IDs (e.g. 4,5,6) to get multiple trainees' feedback; only if current user is coach of each. Omit to get own feedback." },
         },
         required: ["start", "end"],
@@ -243,7 +259,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     {
       name: "get_period_report_json",
-      description: "Generate period training report JSON via /api/reporter/generatejson-sync. Requires X-API-Key. You can query yourself, or trainees you coach. If game_id is provided, current user must be editor/coach of that camp and target user must be a member.",
+      description: "Generate period training report JSON via /api/reporter/generatejson-sync. Requires X-API-Key. You can query yourself, trainees you coach, or any user if you are a platform admin. If game_id is provided, current user must be editor/coach of that camp and target user must be a member.",
       inputSchema: {
         type: "object",
         properties: {
@@ -293,7 +309,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 
     if (name === "list_plans") {
       const searchParams: Record<string, string> = {};
+      if (params.user_id != null) searchParams.user_id = String(params.user_id);
       if (params.start) searchParams.start = String(params.start);
+      if (params.end) searchParams.end = String(params.end);
       if (params.game_id != null) searchParams.game_id = String(params.game_id);
       const res = await openFetch("/plans", { searchParams });
       if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
@@ -320,12 +338,24 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       return textResult(res.body);
     }
 
+    if (name === "get_metrics") {
+      const searchParams: Record<string, string> = {};
+      if (params.user_id != null) searchParams.user_id = String(params.user_id);
+      if (params.start_date) searchParams.start_date = String(params.start_date);
+      if (params.end_date) searchParams.end_date = String(params.end_date);
+      const res = await openFetch("/metrics", { searchParams });
+      if (!res.ok) return textResult(`API error ${res.status}: ${res.body}`, true);
+      return textResult(res.body);
+    }
+
     if (name === "list_feedback") {
       const start = params.start ? String(params.start) : "";
       const end = params.end ? String(params.end) : "";
       if (!start || !end) return textResult("list_feedback requires start and end (YYYY-MM-DD).", true);
       const searchParams: Record<string, string> = { start, end };
       if (params.user_ids != null && String(params.user_ids).trim()) searchParams.user_ids = String(params.user_ids).trim();
+      if (params.page != null) searchParams.page = String(params.page);
+      if (params.page_size != null) searchParams.page_size = String(params.page_size);
       const res = await openFetch("/feedback", {
         searchParams,
       });

@@ -2,7 +2,15 @@
 
 MCP (Model Context Protocol) server that exposes the My Likes open API as tools for LLM clients (e.g. Cursor, other MCP consumers).
 
-## What's New (v1.2.4)
+## What's New (v1.3.0)
+
+- **Platform admin keys**: if the API key owner belongs to the admin group (`qw_auth_group` id 1/2), read tools can query **any** `user_id` with a date range up to **366 days** (`list_activities` is also exempt from the 1 req/min limit). Write tools (push plans, comments, camps) keep normal coach permissions.
+- Added `get_metrics` tool (`GET /api/open/metrics`): current params, daily fitness/fatigue/performance curve, run force & threshold pace change logs, weight logs, PBs
+- `list_plans`: new `user_id` (admin only) and `end` params
+- `list_feedback`: new `page` / `page_size` params
+
+## v1.2.4
+
 
 - Added `get_period_report_json` tool for `GET /api/reporter/generatejson-sync`
 - Added explicit permission notes for self/coached-trainee and `game_id` membership checks
@@ -12,9 +20,10 @@ MCP (Model Context Protocol) server that exposes the My Likes open API as tools 
 
 | Tool | Description |
 |------|-------------|
-| `list_activities` | Activity list (30-day range; optional `user_id` for coach to query trainee; rate limit 1 req / 1 min) |
+| `list_activities` | Activity list (31-day range, 366 for admin; optional `user_id` for coach/admin; rate limit 1 req / 1 min, admin exempt) |
 | `get_health` | Health data for secondary analysis (daily `hrv` + sleep-related daily summary `sleep`). Supports optional `user_id` (single user) or `user_ids` (comma-separated batch trainees). Querying others requires coach permission for each target. Max range 31 days. |
-| `list_plans` | Calendar plans (from start date, 42 days) |
+| `get_metrics` | Training parameter changes in a date range: `current` params, `performance` (CTL/ATL/TSB daily), `param_changes` (run_force / t_pace logs), `weights`, `pbs`. Optional `user_id` (coach/admin). Max 31 days, 366 for admin. |
+| `list_plans` | Calendar plans (from `start`, 42 days, or to `end`; 366 days max for admin). Optional `user_id` (admin only). |
 | `list_feedback` | Training feedback (start/end required, max 7 days). Optional `user_ids` (comma-separated) to get multiple trainees' feedback (only if you are coach of each). Each row includes `plan_title`, `plan_content`, `activity` (linked workout overview with system `score`), `coach_comment`. |
 | `add_feedback_comment` | Coach adds a comment to a trainee's training feedback. Params: `content`, `feedback_id`. |
 | `push_plans` | Push training plans to calendar (batch). Response includes `id` per result (use with delete). Optional `game_id` + `user_ids` for coach batch push to trainees. |
